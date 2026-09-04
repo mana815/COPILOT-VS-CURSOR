@@ -1,0 +1,6 @@
+Comparación Copilor vs Cursor
+
+El GildedRose de Copilot y el de Cursor es el mismo: Cursor copió el refactor y añadió tests. Entre las dos clases no hay diferencia de calidad.
+Ese refactor sí mejora el kata original: menos if anidados, constantes, métodos cortos y el tope 0–50 en un solo sitio. Sigue eligiendo el tipo por el nombre, así que no es un diseño muy extensible.
+La diferencia está en los tests. Copilot entregó solo la clase. Cursor dejó 45 tests en verde. Eso no hace el código “mejor escrito”, pero sí más seguro.
+Conclusión: empatan en el código de producción. Copilot es el autor del refactor. Cursor aporta la verificación.
