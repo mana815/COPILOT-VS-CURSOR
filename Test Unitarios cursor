@@ -1,1 +1,199 @@
 
+# -*- coding: utf-8 -*-
+"""Tests unitarios de las funciones refactorizadas de GildedRose."""
+
+import pytest
+
+from gilded_rose import GildedRose, Item
+
+
+def item(name="foo", sell_in=10, quality=20):
+    return Item(name, sell_in, quality)
+
+
+def rose_for(*items):
+    return GildedRose(list(items))
+
+
+class TestItem:
+    def test_repr(self):
+        assert repr(Item("foo", 5, 10)) == "foo, 5, 10"
+
+
+class TestIncreaseQuality:
+    def test_incrementa_en_uno(self):
+        inventory_item = item(quality=20)
+        GildedRose([])._increase_quality(inventory_item)
+        assert inventory_item.quality == 21
+
+    def test_no_supera_calidad_maxima(self):
+        inventory_item = item(quality=GildedRose.MAX_QUALITY)
+        GildedRose([])._increase_quality(inventory_item)
+        assert inventory_item.quality == GildedRose.MAX_QUALITY
+
+    def test_incrementa_justo_bajo_el_maximo(self):
+        inventory_item = item(quality=GildedRose.MAX_QUALITY - 1)
+        GildedRose([])._increase_quality(inventory_item)
+        assert inventory_item.quality == GildedRose.MAX_QUALITY
+
+
+class TestDecreaseQuality:
+    def test_decrementa_en_uno(self):
+        inventory_item = item(quality=20)
+        GildedRose([])._decrease_quality(inventory_item)
+        assert inventory_item.quality == 19
+
+    def test_no_baja_de_cero(self):
+        inventory_item = item(quality=0)
+        GildedRose([])._decrease_quality(inventory_item)
+        assert inventory_item.quality == 0
+
+    def test_decrementa_calidad_uno(self):
+        inventory_item = item(quality=1)
+        GildedRose([])._decrease_quality(inventory_item)
+        assert inventory_item.quality == 0
+
+
+class TestUpdateBackstagePass:
+    @pytest.mark.parametrize(
+        "sell_in, quality, expected",
+        [
+            (11, 20, 21),
+            (10, 20, 22),
+            (6, 20, 22),
+            (5, 20, 23),
+            (1, 20, 23),
+            (15, 49, 50),
+            (10, 49, 50),
+            (5, 48, 50),
+        ],
+    )
+    def test_incremento_segun_dias(self, sell_in, quality, expected):
+        inventory_item = item(GildedRose.BACKSTAGE_PASS, sell_in, quality)
+        GildedRose([])._update_backstage_pass(inventory_item)
+        assert inventory_item.quality == expected
+        assert inventory_item.sell_in == sell_in
+
+
+class TestUpdateExpiredItem:
+    def test_backstage_pasa_a_cero(self):
+        inventory_item = item(GildedRose.BACKSTAGE_PASS, -1, 40)
+        GildedRose([])._update_expired_item(inventory_item)
+        assert inventory_item.quality == 0
+
+    def test_aged_brie_aumenta_calidad(self):
+        inventory_item = item(GildedRose.AGED_BRIE, -1, 20)
+        GildedRose([])._update_expired_item(inventory_item)
+        assert inventory_item.quality == 21
+
+    def test_aged_brie_respeta_maximo(self):
+        inventory_item = item(GildedRose.AGED_BRIE, -1, 50)
+        GildedRose([])._update_expired_item(inventory_item)
+        assert inventory_item.quality == 50
+
+    def test_item_normal_baja_calidad(self):
+        inventory_item = item("Elixir of the Mongoose", -1, 10)
+        GildedRose([])._update_expired_item(inventory_item)
+        assert inventory_item.quality == 9
+
+    def test_item_normal_no_baja_de_cero(self):
+        inventory_item = item("Elixir of the Mongoose", -1, 0)
+        GildedRose([])._update_expired_item(inventory_item)
+        assert inventory_item.quality == 0
+
+
+class TestUpdateItem:
+    def test_sulfuras_no_cambia(self):
+        inventory_item = item(GildedRose.SULFURAS, 0, 80)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == 0
+        assert inventory_item.quality == 80
+
+    def test_item_normal_baja_calidad_y_sell_in(self):
+        inventory_item = item("foo", 10, 20)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == 9
+        assert inventory_item.quality == 19
+
+    def test_item_normal_caducado_baja_doble(self):
+        inventory_item = item("foo", 0, 20)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == -1
+        assert inventory_item.quality == 18
+
+    def test_aged_brie_aumenta_calidad(self):
+        inventory_item = item(GildedRose.AGED_BRIE, 2, 0)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == 1
+        assert inventory_item.quality == 1
+
+    def test_aged_brie_caducado_aumenta_doble(self):
+        inventory_item = item(GildedRose.AGED_BRIE, 0, 0)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == -1
+        assert inventory_item.quality == 2
+
+    def test_backstage_mas_de_diez_dias(self):
+        inventory_item = item(GildedRose.BACKSTAGE_PASS, 15, 20)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == 14
+        assert inventory_item.quality == 21
+
+    def test_backstage_diez_dias_o_menos(self):
+        inventory_item = item(GildedRose.BACKSTAGE_PASS, 10, 20)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == 9
+        assert inventory_item.quality == 22
+
+    def test_backstage_cinco_dias_o_menos(self):
+        inventory_item = item(GildedRose.BACKSTAGE_PASS, 5, 20)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == 4
+        assert inventory_item.quality == 23
+
+    def test_backstage_tras_el_concierto(self):
+        inventory_item = item(GildedRose.BACKSTAGE_PASS, 0, 20)
+        GildedRose([])._update_item(inventory_item)
+        assert inventory_item.sell_in == -1
+        assert inventory_item.quality == 0
+
+
+class TestUpdateQuality:
+    def test_actualiza_varios_items(self):
+        normal = item("foo", 5, 10)
+        brie = item(GildedRose.AGED_BRIE, 2, 0)
+        sulfuras = item(GildedRose.SULFURAS, 0, 80)
+        rose_for(normal, brie, sulfuras).update_quality()
+        assert (normal.sell_in, normal.quality) == (4, 9)
+        assert (brie.sell_in, brie.quality) == (1, 1)
+        assert (sulfuras.sell_in, sulfuras.quality) == (0, 80)
+
+    def test_lista_vacia(self):
+        GildedRose([]).update_quality()
+
+    @pytest.mark.parametrize(
+        "name, sell_in, quality, expected_sell_in, expected_quality",
+        [
+            ("+5 Dexterity Vest", 10, 20, 9, 19),
+            ("Elixir of the Mongoose", 5, 7, 4, 6),
+            ("Elixir of the Mongoose", 0, 7, -1, 5),
+            ("Elixir of the Mongoose", 5, 0, 4, 0),
+            (GildedRose.AGED_BRIE, 2, 0, 1, 1),
+            (GildedRose.AGED_BRIE, 0, 0, -1, 2),
+            (GildedRose.AGED_BRIE, 2, 50, 1, 50),
+            (GildedRose.SULFURAS, 0, 80, 0, 80),
+            (GildedRose.SULFURAS, -1, 80, -1, 80),
+            (GildedRose.BACKSTAGE_PASS, 15, 20, 14, 21),
+            (GildedRose.BACKSTAGE_PASS, 10, 49, 9, 50),
+            (GildedRose.BACKSTAGE_PASS, 5, 49, 4, 50),
+            (GildedRose.BACKSTAGE_PASS, 1, 20, 0, 23),
+            (GildedRose.BACKSTAGE_PASS, 0, 20, -1, 0),
+        ],
+    )
+    def test_casos_del_kata(
+        self, name, sell_in, quality, expected_sell_in, expected_quality
+    ):
+        inventory_item = item(name, sell_in, quality)
+        rose_for(inventory_item).update_quality()
+        assert inventory_item.sell_in == expected_sell_in
+        assert inventory_item.quality == expected_quality
